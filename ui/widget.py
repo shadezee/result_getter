@@ -1,3 +1,4 @@
+import threading
 from PySide6.QtCore import Slot
 from PySide6.QtWidgets import QWidget
 from ui.UI_SIU_WEB import *
@@ -14,6 +15,7 @@ class Widget(QWidget, Ui_siu_web):
 
         self.logic = ApplicationLogic()
 
+        self.logic.DISABLE_RUN_SIGNAL.connect(self.toggle_run_state)
         self.logic.DISPLAY_TERMINAL_SIGNAL.connect(self.display_message)
         self.logic.DISPLAY_DB_ID_SIGNAL.connect(self.display_db_id)
         self.logic.DISPLAY_CREDENTIALS_SIGNAL.connect(self.refresh_credential_list)
@@ -65,6 +67,12 @@ class Widget(QWidget, Ui_siu_web):
         self.te_display_terminal.setText(f'{message_type}: {message}')
         return True
 
+    @Slot()
+    def toggle_run_state(self):
+        btn_state = self.btn_run.isEnabled()
+        self.setEnabled(not btn_state)
+        return True
+
     def validate_selection_and_input(self, selected_item, prn, seat_num):
         item_text = selected_item.text()
 
@@ -112,6 +120,7 @@ class Widget(QWidget, Ui_siu_web):
         db_id = self.get_db_id()
 
         if (prn and seat_num):
+            self.te_display_terminal.clear()
             selected_items = self.lst_credentials.selectedItems()
             selected_item = selected_items[0]
 
@@ -123,4 +132,4 @@ class Widget(QWidget, Ui_siu_web):
                 quick = False
                 db_id = 0
 
-            self.logic.run(prn, seat_num, db_id, quick)
+            threading.Thread(target=self.logic.run, args=(prn, seat_num, db_id, quick)).start()
