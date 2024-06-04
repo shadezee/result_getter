@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, QObject, Slot
+from PySide6.QtCore import Slot
 from PySide6.QtWidgets import QWidget
 from ui.UI_SIU_WEB import *
 from logic.logic import ApplicationLogic

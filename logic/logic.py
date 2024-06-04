@@ -1,33 +1,23 @@
 import os
 import requests
 import re as regEx
-from database.database import Database
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QApplication
+from logic.constants import *
 
 class ApplicationLogic(QObject):
-    # CONSTANTS
-    INITIAL_URL_P1 = ''
-    INITIAL_URL_P2 = ''
-    FINAL_URL_P1 = ''
-    FINAL_URL_P2 = ''
-    DOWNLOAD_URL_P1 = ''
-    DOWNLOAD_URL_P2 = ''
-    E_ARRAY_MSG = []
-    DB_INSTANCE = Database()
-
     # SIGNALS
     DISPLAY_TERMINAL_SIGNAL = Signal(str, str)
     DISPLAY_DB_ID_SIGNAL = Signal(str)
     DISPLAY_CREDENTIALS_SIGNAL = Signal(object)
 
     def save_credentials(self, prn, seat_num, db_id):
-        data = self.DB_INSTANCE.database_action('add', prn, seat_num, db_id)
+        data = DB_INSTANCE.database_action('add', prn, seat_num, db_id)
         self.get_credentials()
         return data
 
     def get_credentials(self, prn=0, seat_num=0, db_id=0):
-        data = self.DB_INSTANCE.database_action('get', prn, seat_num, db_id)
+        data = DB_INSTANCE.database_action('get', prn, seat_num, db_id)
         self.emit_credentials(data)
         return data
 
@@ -67,13 +57,13 @@ class ApplicationLogic(QObject):
                 self.emit_signal.emit('unexpected error', f'code - {response.status_code}')
 
     def generate_download_url(self, db_id):
-        download_url = f'{self.DOWNLOAD_URL_P1}{db_id}{self.DOWNLOAD_URL_P2}'
+        download_url = f'{DOWNLOAD_URL_P1}{db_id}{DOWNLOAD_URL_P2}'
         return download_url
 
     def validate_response(self, msg):
-        if(msg in self.E_ARRAY_MSG):
-            if msg == self.E_ARRAY_MSG[2]:
-                self.emit_signal('error', self.E_ARRAY_MSG[2])
+        if(msg in E_ARRAY_MSG):
+            if msg == E_ARRAY_MSG[2]:
+                self.emit_signal('error', E_ARRAY_MSG[2])
                 return False
             self.emit_signal('error', msg)
             return False
@@ -81,7 +71,7 @@ class ApplicationLogic(QObject):
             return True
 
     def generate_final_url(self, seat_num, db_id):
-        final_url = f'{self.FINAL_URL_P1}{db_id}{self.FINAL_URL_P2}{seat_num}'
+        final_url = f'{FINAL_URL_P1}{db_id}{FINAL_URL_P2}{seat_num}'
         return final_url
 
     def process_final_url(self, final_url, db_id, quick):
@@ -107,14 +97,14 @@ class ApplicationLogic(QObject):
                 self.emit_signal.emit('unexpected error', f'code - {response.status_code}')
 
     def get_database_id(self, response):
-        pattern = r''
+        pattern = PATTERN
         match = regEx.search(pattern, response)
         db_id = match.group(1)
         self.emit_db_id(db_id)
         return db_id
 
     def generate_initial_url(self, prn):
-        initial_url = f'{self.INITIAL_URL_P1}{prn}{self.INITIAL_URL_P2}'
+        initial_url = f'{INITIAL_URL_P1}{prn}{INITIAL_URL_P2}'
         return initial_url
 
     def emit_credentials(self, data):
@@ -165,6 +155,7 @@ class ApplicationLogic(QObject):
 
                 if (self.db):
                     self.save_credentials(prn,seat_num, db_id)
+                    self.emit_signal.emit('Complete:', f'file generated.')
                     self.operation = False
         else:
             download_url = self.generate_download_url(db_id)
@@ -173,3 +164,4 @@ class ApplicationLogic(QObject):
                 if not(self.process_download_url(download_url, prn, quick)):
                     download_url = self.process_final_url(final_url, db_id)
                     self.process_download_url(download_url, prn, quick)
+            self.emit_signal.emit('Complete:', f'file generated.')
