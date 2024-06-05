@@ -3,7 +3,6 @@ import requests
 import re as regEx
 from time import sleep
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtWidgets import QApplication
 from logic.emitter import SignalEmitter
 from logic.constants import *
 
@@ -17,7 +16,7 @@ class ApplicationLogic(QObject):
     def __init__(self):
         super(ApplicationLogic, self).__init__()
         self.emitter = SignalEmitter()
-        self.emitter.signal.connect(self.emit_signal)
+        self.emitter.THREAD_SIGNAL.connect(self.emit_signal)
         self.emitter.start()
 
     def save_credentials(self, prn, seat_num, db_id):
@@ -31,17 +30,17 @@ class ApplicationLogic(QObject):
         return data
 
     def download(self, prn, response):
-        base_path = os.path.dirname(os.path.abspath(__file__)) + r'\results'
-        if os.path.exists(base_path) == False:
-            os.makedirs(base_path)
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        results_dir = os.path.join(parent_dir, 'results')
+        os.makedirs(results_dir, exist_ok=True)
+        output_path = os.path.join(results_dir, f"result_{str(prn)}.pdf")
 
-        output_path = os.path.join(base_path, f"result_{str(prn)}.pdf")
         with open(output_path, 'wb') as file:
             file.write(response.content)
             file.close()
 
         if(os.path.exists(output_path)):
-            os.startfile(base_path)
+            os.startfile(results_dir)
             return True
         else:
             self.download(prn, response)
@@ -65,11 +64,12 @@ class ApplicationLogic(QObject):
                     self.emitter.add_message('server down', 'retrying...') 
                 else:
                     self.emitter.add_message('unexpected error', f'code - {response.status_code}')
-            except requests.exceptions.ChunkedEncodingError:
-                self.emitter.add_message('timeout required', f'restarting in 10 seconds')
-                sleep(10)
-            except ConnectionResetError:
-                self.emitter.add_message('timeout required', f'restarting in 10 seconds')
+            except (
+                    requests.exceptions.ChunkedEncodingError
+                    or requests.exceptions.ConnectionError
+                    or ConnectionResetError
+                ):
+                self.emitter.add_message('timeout required', f'restarting in 10 seconds...')
                 sleep(10)
 
     def generate_download_url(self, db_id):
@@ -78,9 +78,6 @@ class ApplicationLogic(QObject):
 
     def validate_response(self, msg):
         if(msg in E_ARRAY_MSG):
-            if msg == E_ARRAY_MSG[2]:
-                self.emitter.add_message('error', E_ARRAY_MSG[2])
-                return False
             self.emitter.add_message('error', msg)
             return False
         else:
@@ -102,19 +99,18 @@ class ApplicationLogic(QObject):
                         return download_url
                     else:
                         self.end()
-                elif response.status_code == 404:
+                elif (response.status_code == 404):
                     self.emitter.add_message('not found', 'terminating...')
                     if not (quick):
                         self.end()
-                elif response.status_code == 503:
+                elif (response.status_code == 503):
                     self.emitter.add_message('server down', 'retrying...')
                 else:
                     self.emitter.add_message('unexpected error', f'code - {response.status_code}')
-            except (requests.exceptions.ConnectionError):
-                self.emitter.add_message('ConnectionError:', 'Please check your internet connection...')
-            except requests.exceptions.HTTPError:
-                self.emitter.add_message('HTTPError:', 'Please check your internet connection...')
-            except requests.exceptions.RequestException as e:
+            except (requests.exceptions.ConnectionError or requests.exceptions.HTTPError):
+                self.emitter.add_message('ConnectionError:', 'Please check your internet connection...\nRetrying in 7 seconds...')
+                sleep(7)
+            except (requests.exceptions.RequestException) as e:
                 self.emitter.add_message('unexpected error', f'{e}')
 
     def process_initial_url(self, initial_url, seat_num):
@@ -129,22 +125,19 @@ class ApplicationLogic(QObject):
                         self.initial = False
                         return db_id, final_url
                     else:
-                        self.operation = False
-                elif response.status_code == 404:
+                        self.end()
+                elif (response.status_code == 404):
                     self.emitter.add_message('not found', 'terminating...')
                     sleep(2)
                     self.end()
-                elif response.status_code == 503:
+                elif (response.status_code == 503):
                     self.emitter.add_message('server down', 'retrying...')
                 else:
                     self.emitter.add_message('unexpected error', f'code - {response.status_code}')
-            except (requests.exceptions.ConnectionError):
-                self.emitter.add_message('ConnectionError:', 'Please check your internet connection...')
+            except (requests.exceptions.ConnectionError or requests.exceptions.HTTPError):
+                self.emitter.add_message('ConnectionError', 'Please check your internet connection...\nRetrying in 7 seconds...')
                 sleep(7)
-            except requests.exceptions.HTTPError:
-                self.emitter.add_message('HTTPError:', 'Please check your internet connection...')
-                sleep(4)
-            except requests.exceptions.RequestException as e:
+            except (requests.exceptions.RequestException) as e:
                 self.emitter.add_message('unexpected error', f'{e}')
 
     def get_database_id(self, response):
@@ -154,7 +147,7 @@ class ApplicationLogic(QObject):
             self.emit_db_id(db_id)
             return db_id
         except AttributeError:
-            self.emitter.add_message('unexpected error: ', 'please check your credentials')
+            self.emitter.add_message('unexpected error', 'please check your credentials')
             sleep(2)
             self.end()
             return False
@@ -185,7 +178,6 @@ class ApplicationLogic(QObject):
         self.final = False
         self.emit_run_state_toggle()
         self.download_opn = False
-        self.emitter.stop()
 
     def run(self, prn, seat_num, db_id, quick):
         self.emit_run_state_toggle()
@@ -198,22 +190,23 @@ class ApplicationLogic(QObject):
         if not (quick):
             initial_url = self.generate_initial_url(prn)
             while (self.operation):
-                QApplication.sendPostedEvents()
-                db_id, final_url = self.process_initial_url(initial_url, seat_num)
-
-                download_url = self.process_final_url(final_url, db_id, quick)
-                self.process_download_url(download_url, prn, quick)
+                try:
+                    db_id, final_url = self.process_initial_url(initial_url, seat_num)
+                except TypeError:
+                    pass
+                if (db_id and final_url):
+                    download_url = self.process_final_url(final_url, db_id, quick)
+                    self.process_download_url(download_url, prn, quick)
 
                 if (self.db):
                     self.save_credentials(prn,seat_num, db_id)
-                    self.emitter.add_message('Complete:', f'file generated.')
+                    self.emitter.add_message('Complete', f'file generated.')
                     self.operation = False
         else:
             download_url = self.generate_download_url(db_id)
             while (self.download_opn):
-                QApplication.sendPostedEvents()
                 if not(self.process_download_url(download_url, prn, quick)):
                     download_url = self.process_final_url(final_url, db_id)
                     self.process_download_url(download_url, prn, quick)
-            self.emitter.add_message('Complete:', f'file generated.')
+            self.emitter.add_message('Complete', f'file generated.')
             self.end()
