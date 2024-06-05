@@ -3,6 +3,7 @@ from PySide6.QtCore import Slot
 from PySide6.QtWidgets import QWidget
 from ui.UI_SIU_WEB import *
 from logic.logic import ApplicationLogic
+from logic.emitter import SignalEmitter
 
 class Widget(QWidget, Ui_siu_web):
     def __init__(self):
@@ -14,11 +15,13 @@ class Widget(QWidget, Ui_siu_web):
         self.ln_seat_no.setEnabled(True)
 
         self.logic = ApplicationLogic()
+        self.emitter = SignalEmitter()
 
         self.logic.DISABLE_RUN_SIGNAL.connect(self.toggle_run_state)
         self.logic.DISPLAY_TERMINAL_SIGNAL.connect(self.display_message)
         self.logic.DISPLAY_DB_ID_SIGNAL.connect(self.display_db_id)
         self.logic.DISPLAY_CREDENTIALS_SIGNAL.connect(self.refresh_credential_list)
+        self.emitter.THREAD_SIGNAL.connect(self.display_message)
         self.lst_credentials.itemSelectionChanged.connect(self.auto_fill)
 
         self.generate_credential_list()

@@ -1,3 +1,4 @@
+import os
 import sqlite3
 
 class Database():
@@ -41,7 +42,12 @@ class Database():
         return True
 
     def database_action(self, opn_type, prn, seat_num, db_id):
-        conn = sqlite3.connect('database/database.db')
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        db_dir = os.path.join(parent_dir, 'database')
+        os.makedirs(db_dir, exist_ok=True)
+        db_dir = os.path.join(db_dir, 'database.db')
+
+        conn = sqlite3.connect(db_dir)
         cursor = conn.cursor()
 
         self.create_table(conn, cursor)
