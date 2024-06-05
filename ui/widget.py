@@ -1,6 +1,8 @@
 import threading
 from PySide6.QtCore import Slot
 from PySide6.QtWidgets import QWidget
+from PySide6.QtGui import QIcon
+import ui.res
 from ui.UI_SIU_WEB import *
 from logic.logic import ApplicationLogic
 from logic.emitter import SignalEmitter
@@ -9,6 +11,7 @@ class Widget(QWidget, Ui_siu_web):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
+        self.setWindowIcon(QIcon(':/icon.ico'))
 
         self.btn_run.clicked.connect(self.run)
         self.ln_uid.setEnabled(False)
