@@ -135,4 +135,5 @@ class Widget(QWidget, Ui_siu_web):
                 quick = False
                 db_id = 0
 
+            self.display_message('Running', f'for {prn}.')
             threading.Thread(target=self.logic.run, args=(prn, seat_num, db_id, quick)).start()
