@@ -1,7 +1,7 @@
 import threading
-from PySide6.QtCore import Slot
+from PySide6.QtCore import Qt, QEvent, Slot
 from PySide6.QtWidgets import QWidget
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QKeyEvent
 import ui.res
 from ui.UI_SIU_WEB import *
 from logic.logic import ApplicationLogic
@@ -29,6 +29,10 @@ class Widget(QWidget, Ui_siu_web):
 
         self.generate_credential_list()
         self.lst_credentials.setCurrentRow(0)
+        self.ln_prn.installEventFilter(self)
+        self.ln_seat_no.installEventFilter(self)
+        self.lst_credentials.installEventFilter(self)
+        self.btn_run.installEventFilter(self)
 
     @Slot()
     def auto_fill(self):
@@ -119,6 +123,12 @@ class Widget(QWidget, Ui_siu_web):
         except ValueError:
             self.te_display_terminal.setText('Please enter a valid PRN.')
             return False
+
+    def eventFilter(self, obj, event):
+        if (event.type() == QEvent.KeyPress) and (event.key() == (Qt.Key_Return  or Qt.Key_Enter)):
+            self.run()
+            return True
+        return False
 
     def run(self):
         prn = self.get_prn()
